@@ -116,7 +116,8 @@ class Suitor(BaseSuitor):
     def _prepare_bouquet_last_round(self, remaining_flowers, recipient_id):
         num_remaining = sum(remaining_flowers.values())
         size = np.argmax(self.weights[recipient_id]['number'])
-
+        print("WEIGHTSSSSS")
+        print(self.weights[recipient_id])
         if size > 0:
             scored_flowers = []
             for flower in remaining_flowers.keys():
@@ -184,7 +185,23 @@ class Suitor(BaseSuitor):
 
         # Last day: best bouquet
         elif(self.days_remaining == self.days):
-            return list(map(lambda recipient_id: self._prepare_bouquet_last_round(remaining_flowers, recipient_id), recipient_ids))
+            score_Dict = {}
+            all_ids = np.arange(self.num_suitors)
+            recipient_ids = all_ids[all_ids != self.suitor_id]
+            
+            for i in recipient_ids:
+                bouqs = self.bouq_Dict[i]
+                highest = 0
+                for bouq in bouqs:
+                    score_prio = bouq[1] * (self.num_suitors - bouq[2])
+                    if score_prio > highest:
+                        highest = score_prio
+                score_Dict[i] = highest
+            
+            score_Dict = dict(sorted(score_Dict.items(), key=lambda item: item[1], reverse=True))
+            print("LAST ROUND")
+            print(score_Dict)
+            return list(map(lambda recipient_id: self._prepare_bouquet_last_round(remaining_flowers, recipient_id), score_Dict))
             
         # Every day in between
         else:
@@ -197,14 +214,21 @@ class Suitor(BaseSuitor):
             score_Dict = {}
             all_ids = np.arange(self.num_suitors)
             recipient_ids = all_ids[all_ids != self.suitor_id]
+            
             for i in recipient_ids:
+                already_know = 0
                 bouqs = self.bouq_Dict[i]
                 highest = 0
                 for bouq in bouqs:
+                    if (bouq[1]==1.0):
+                        already_know = 1
                     score_prio = bouq[1] * (self.num_suitors - bouq[2])
                     if score_prio > highest:
                         highest = score_prio
-                score_Dict[i] = highest
+                if (already_know):
+                    score_Dict[i] = 0 #do not care about this player since his optimal weights have already been configured
+                else:
+                    score_Dict[i] = highest
             
             score_Dict = dict(sorted(score_Dict.items(), key=lambda item: item[1], reverse=True))
 
@@ -312,12 +336,13 @@ class Suitor(BaseSuitor):
                 flower_dict['colors'][flower.color] += 1
                 flower_dict['types'][flower.type] += 1
                 flower_dict['number'] += 1
-
+           
             estimate = 0
             for att in flower_dict.keys():
                 if att == 'number':
                     estimate += self.weights[id][att][flower_dict[att] - 1] * flower_dict[att]
-                    estimate /= flower_dict[att]
+                    if (flower_dict[att] != 0):
+                        estimate /= flower_dict[att]
                 else:
                     for sp in flower_dict[att].keys():
                         estimate += (self.weights[id][att][sp] * flower_dict[att][sp])
